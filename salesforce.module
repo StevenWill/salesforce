@@ -117,21 +117,21 @@ function salesforce_batch_process($object, $account, $instance_url, $access_toke
   $newnode->language = 'und';
 
   $newnode->title = $record['Name'];
-  
+
   // Unset fields we do not want to save.
   unset($record['attributes']);
   unset($record['Description']);
-  
+
   // Iterate through fields and map to the node field.
-  foreach($record as $field => $record) {
+  foreach($record as $field => $value) {
     $field = salesforce_api_prep_field($field);
-    $newnode->{'sf_' . $field}['und']['0']['value'] = $record;
+    $newnode->{'sf_' . $field}['und']['0']['value'] = $value;
   }
-  
+
   node_object_prepare($newnode);
 
   node_save($newnode);
-  
+
   // Message to display when operation complete
   $context['message'] = t("Import # @id - @name imported", array('@id' => $record['Id'], '@name' => $record['Name']));
   // defien operation as finished
