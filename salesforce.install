@@ -1,0 +1,34 @@
+<?php
+/**
+ * @file
+ * Install Salesforce
+ * 
+ */
+
+/**
+ * Implement hook_install()
+ *
+ */
+function salesforce_install() {
+  variable_set('salesforce_client_id', '');
+  variable_set('salesforce_client_secret', '');
+  variable_set('salesforce_login_uri', 'https://login.salesforce.com');
+  variable_set('salesforce_username', '');
+  variable_set('salesforce_password', '');
+  variable_set('salesforce_security_token', '');
+  variable_set('salesforce_objects', 'Account, Contact, Campaign, Lead, Opportunity');
+}
+
+/**
+ * Implement hook_uninstall()
+ *
+ */
+function salesforce_uninstall() {
+  variable_del('salesforce_client_id');
+  variable_del('salesforce_client_secret');
+  variable_del('salesforce_login_uri');
+  variable_del('salesforce_username');
+  variable_del('salesforce_password');
+  variable_del('salesforce_security_token');
+  variable_del('salesforce_objects');
+}

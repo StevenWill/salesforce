@@ -1,0 +1,251 @@
+<?php
+/**
+ *@file
+ * Module to define APIs for Salesforce
+ * 
+ */
+
+/**
+ * oauth check and setting of $_SESSION.
+ * 
+ */
+function salesforce_api_access_session() {
+  $params = "grant_type=password&client_id=". variable_get('salesforce_client_id', '') .
+          "&client_secret=". variable_get('salesforce_client_secret', '') .
+          "&username=" . variable_get('salesforce_username', '') . "&password=" .
+      variable_get('salesforce_password', '') . "" . variable_get('salesforce_security_token', '') . "";
+
+  $token_url = variable_get('salesforce_login_uri', '') . "/services/oauth2/token";
+
+  $curl = curl_init($token_url);
+  curl_setopt($curl, CURLOPT_HEADER, false);
+  curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($curl, CURLOPT_POST, true);
+  curl_setopt($curl, CURLOPT_POSTFIELDS, $params);
+  $json_response = curl_exec($curl);
+  $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+  if ( $status != 200 ) {
+    watchdog('salesforce_session', 'Call to URL @url failed with @status.', array('@url' => $token_url, '@status' => $status));
+    die("Error: call to URL $token_url failed with status $status");
+  }
+
+  $return = json_decode($json_response, true);
+
+  $_SESSION['salesforce'] = array(
+    'instance_url' => $return['instance_url'],
+    'access_token' => $return['access_token'],
+    'registered' => time());
+
+}
+
+/**
+ * Check content type and create if not available.
+ *
+ * @param type $content
+ * @return type 
+ */
+function salesforce_api_content_type($content) {
+  $query = db_select('node_type', 'nt')
+    ->fields('nt', array('type'))
+    ->condition('nt.type', strtolower($content), '=')
+    ->range(0,1);
+  $result = $query->execute()->rowCount();
+  
+  if ($result != 1) {
+    // Define node type as an associative array.
+    $content_type = array(
+      'type' => 'sf_' . strtolower($content),
+      'name' => 'sf_' . strtolower($content),
+      'base' => 'node_content',
+      'description' => t('Salesforce content type'),
+      'title_label' => t('Name'),
+      'custom' => TRUE,
+    );
+
+    // Declare defaults not already defined.
+    $content_type = node_type_set_defaults($content_type);
+
+    // Save the content type
+    node_type_save($content_type);
+    
+    watchdog('salesforce_content_type', 'Content type sf_@ct was created.', array('@ct' => strtolower($content)));
+  }
+  return $result;
+}
+
+/**
+ * Install fields and field instances.
+ *
+ * @param type $content_type
+ * @param type $field 
+ */
+function salesforce_api_install_fields($content_type, $field) {
+  // Create all the fields we are adding to our content type.
+  $check_field = field_info_field('sf_' . $field);
+  if (!isset($check_field)){
+    $newfield = array(
+      'field_name' => 'sf_' . $field, 
+      'active' => '1',
+      'cardinality' => '1',
+      'deleted' => '0',
+      'foreign keys' => array(
+        'format' => array(
+          'columns' => array(
+            'format' => 'format',
+          ),
+          'table' => 'filter_format',
+        ),
+      ),
+      'indexes' => array(
+        'format' => array(
+          0 => 'format',
+        ),
+      ),
+      'module' => 'text',
+      'settings' => array(
+        'max_length' => '255',
+        'profile2_private' => FALSE,
+      ),
+      'translatable' => '0',
+      'type' => 'text',
+    );
+    field_create_field($newfield);
+  }
+  
+  $check_instance = field_info_instance('node', 'sf_' . $field, 'sf_' . strtolower($content_type));
+  if (!isset($check_instance)){
+    // Create all the instances for our fields.
+    $instance = array(
+      'entity_type' => 'node',
+      'bundle' => 'sf_' . strtolower($content_type),
+      'field_name' => 'sf_' . strtolower($field),
+      'label'       => $field,
+      'default_value' => NULL,
+      'deleted' => '0',
+      'description' => '',
+      'display' => array(
+        'default' => array(
+          'label' => 'above',
+          'module' => 'text',
+          'settings' => array(),
+          'type' => 'text_default',
+          'weight' => 2,
+        ),
+        'teaser' => array(
+          'label' => 'above',
+          'settings' => array(),
+          'type' => 'hidden',
+          'weight' => 0,
+        ),
+      ),
+      'required' => 0,
+      'settings' => array(
+        'text_processing' => '0',
+        'user_register_form' => FALSE,
+      ),
+      'widget' => array(
+        'active' => 1,
+        'module' => 'text',
+        'settings' => array(
+          'size' => '60',
+        ),
+        'type' => 'text_textfield',
+        'weight' => '-2',
+      ),
+    );
+
+    field_create_instance($instance);
+  }
+
+}
+
+/**
+ * Prepare field for creation on Drupal.
+ *
+ * @param type $field
+ * @return type 
+ */
+function salesforce_api_prep_field($field) {
+  $field = strtolower($field);
+  return $field;
+}
+
+/**
+ * REST request to list specified object.
+ *
+ * @param type $object
+ * @param type $instance_url
+ * @param type $access_token
+ * @return type 
+ */
+function salesforce_api_object_show($object, $instance_url, $access_token) {
+  $query = "SELECT Name, Id from $object";
+  $url = "$instance_url/services/data/v20.0/query?q=" . urlencode($query);
+
+  $curl = curl_init($url);
+  curl_setopt($curl, CURLOPT_HEADER, false);
+  curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($curl, CURLOPT_HTTPHEADER,
+    array("Authorization: OAuth $access_token"));
+
+  $json_response = curl_exec($curl);
+  
+  $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+
+  if ( $status != 200 ) {
+    watchdog('salesforce_rest', 'Call to URL @url failed with @status, response @json_response, curl_error @curl_error, curl_errno @curl_errno', array(
+      '@url' => $url,
+      '@status' => $status,
+      '@response' => $json_response,
+      '@curl_error' => curl_error($curl),
+      '@curl_errno' => curl_errno($curl)));
+    die("Error: call to URL $url failed with status $status, response $json_response, curl_error " . 
+        curl_error($curl) . ", curl_errno " . curl_errno($curl));
+  }
+  
+  curl_close($curl);
+
+  $response = json_decode($json_response, true);
+
+  return $response;
+}
+
+/**
+ * REST request to return object of id.
+ *
+ * @param type $object
+ * @param type $id
+ * @param type $instance_url
+ * @param type $access_token
+ * @return type 
+ */
+function salesforce_api_object_show_by_id($object, $id, $instance_url, $access_token) {
+  $url = "$instance_url/services/data/v20.0/sobjects/$object/$id";
+
+  $curl = curl_init($url);
+  curl_setopt($curl, CURLOPT_HEADER, false);
+  curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($curl, CURLOPT_HTTPHEADER,
+    array("Authorization: OAuth $access_token"));
+
+  $json_response = curl_exec($curl);
+
+  $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+
+  if ( $status != 200 ) {
+    watchdog('salesforce_rest', 'Call to URL @url failed with @status, response @json_response, curl_error @curl_error, curl_errno @curl_errno', array(
+      '@url' => $url,
+      '@status' => $status,
+      '@response' => $json_response,
+      '@curl_error' => curl_error($curl),
+      '@curl_errno' => curl_errno($curl)));
+    die("Error: call to URL $url failed with status $status, response $json_response, curl_error " . 
+        curl_error($curl) . ", curl_errno " . curl_errno($curl));
+  }
+
+  curl_close($curl);
+
+  $response = json_decode($json_response, true);
+
+  return $response;
+}

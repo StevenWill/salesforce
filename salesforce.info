@@ -1,0 +1,6 @@
+name = Salesforce
+description = Salesforce integration with Drupal.
+core = 7.x
+package = Salesforce
+
+dependencies[] = salesforce_api

@@ -1,0 +1,4 @@
+name = Salesforce API for REST interaction with Salesforce.
+description = API for authentication, listing, updating and deleting records.
+package = Salesforce
+core = 7.x

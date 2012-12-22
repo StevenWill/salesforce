@@ -1,0 +1,60 @@
+<?php
+/**
+ * @file
+ * Test for Salesforce module
+ *  
+ */
+
+class salesforce_testcase extends DrupalWebTestCase {
+  public static function getInfo() {
+    return array(
+      'name' => 'Salesforce',
+      'description' => 'Test Salesforce setup and import.',
+      'group' => 'Salesforce',
+    );
+  }
+  
+  function setUp() {
+    // Enable the module.
+    parent::setUp('salesforce_api', 'salesforce');
+  }
+  
+  function salesforce_createuser() {
+    $rid = 3;//Administrator role
+    // Create a user assigned to that role.
+    $edit = array();
+    $edit['name']   = $this->randomName();
+    $edit['mail']   = $edit['name'] . '@example.com';
+    $edit['roles']  = array($rid => $rid);
+    $edit['pass']   = user_password();
+    $edit['status'] = 1;
+    $account = user_save('', $edit);
+    
+    // Create and login user.
+    $account = $this->drupalCreateUser(array('access content', 'administer modules'));
+    $this->drupalLogin($account);
+  }
+  
+  //TODO: Finihs writing simpletest functions.
+  function salesforce_testsetup() {
+    
+    // Test saving settings.
+    $edit = array(
+      'salesforce_client_id' => '',
+      'salesforce_client_secret' => '',
+      'salesforce_security_token' => '',
+      'salesforce_username' => '',
+      'salesforce_password' => '',
+      'salesforce_login_uri' => '',
+      'salesforce_objects' => '',
+    );
+    $this->drupalPost('admin/config/services/salesforce', $edit, t('Save Configuration'));
+  }
+  
+  function salesforce_testimport() {
+    //TODO: Write simple test import.
+
+    $this->drupalPost('admin/config/services/salesforce_import', array(), t('Import'));
+    //$this->assertText(t(''));
+  }
+}

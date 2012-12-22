@@ -1,0 +1,190 @@
+<?php
+/**
+ * @file module for salesforce
+ */
+
+/**
+ * Implement hook_menu()
+ */
+function salesforce_menu() {
+  $items = array();
+  $items['admin/config/services/salesforce'] = array(
+    'title' => t('Salesforce: Account Setup'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('salesforce_admin_form'),
+    'file' => 'salesforce.admin.inc',
+    'access arguments' => array('administer modules'),
+    'description' => t('Account information to access Salesforce.'),
+  );
+  $items['admin/config/services/salesforce_import'] = array(
+    'title' => t('Salesforce: Import Accounts'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('salesforce_import'),
+    'access arguments' => array('administer modules'),
+    'file' => 'salesforce.admin.inc',
+    'description' => t('Import records from Salesforce'),
+  );
+  return $items;
+}
+
+/**
+ * Define batch import and processes.
+ *
+ * @param type $form
+ * @param type $form_state 
+ */
+function salesforce_batch($form, $form_state) {
+  // Define the batch settings.
+  $batch = array(
+    'title' => t('Import Jobs'), // Title to display while running.
+    'operations' => array(), // Operations to complete, in order. Defined below.
+    'finished' => 'salesforce_accounts_batch_finished', // Last function to call.
+    'init_message' => t('Initializing...'),
+    'progress_message' => t('Operation @current out of @total.'),
+    'error_message' => t('Job importing received a error.'),
+  );
+  
+  // Check for the access token.
+  if (!isset($_SESSION['salesforce']['access_token']) || $_SESSION['salesforce']['access_token'] == '') {
+    salesforce_api_access_session();
+  }
+  // Unset the session if it is to old.
+  if ((time() - $_SESSION['salesforce']['registered']) > (30 * 60)) {
+    salesforce_api_access_session();
+  }
+  
+  $object = $form_state['values']['object'];
+  $instance_url = $_SESSION['salesforce']['instance_url'];
+  $access_token = $_SESSION['salesforce']['access_token'];
+  
+  // REST api request to return a list of the objects
+  $return = salesforce_api_object_show($object, $instance_url, $access_token);
+
+  // Check for the content type and create if not available. 
+  $batch['operations'][] = array('salesforce_api_content_type', array($object));
+  // Check for object fields and compare to fields on the content type.
+  $batch['operations'][] = array('salesforce_batch_install_fields', array($object, $return['records']['0']['Id'], $instance_url, $access_token));
+  
+  foreach($return['records'] as $account) {
+    // Iterate through each Object record and save or update as node.
+    $batch['operations'][] = array('salesforce_batch_process', array($object, $account, $instance_url, $access_token));
+  }
+
+  // Start the batch process.
+  batch_set($batch);
+}
+
+/**
+ * Salesforce batch process to create notes and map fields.
+ *
+ * @global type $user
+ * @param type $object
+ * @param type $account
+ * @param type $instance_url
+ * @param type $access_token
+ * @param type $context 
+ */
+function salesforce_batch_process($object, $account, $instance_url, $access_token, &$context) {
+  global $user;
+
+  // Perform REST request for specific record and return fields.
+  $record = salesforce_api_object_show_by_id($object, $account['Id'], $instance_url, $access_token);
+
+  // Check if the Id field is available and query to match on a record
+  $check_field = field_info_field('sf_id');
+  if (isset($check_field)) {
+    $query = db_select('field_data_sf_id', 'id')
+        ->fields('id', array('entity_id'))
+        ->condition('id.sf_id_value', $record['Id'], '=');
+    $nid = $query->execute()->fetchField();
+  }
+
+  // Create a node object, and add node properties.
+  $newnode = (object) NULL;
+  // If record is found above, add the node nid to update the record.
+  if (!empty($nid)) {
+    $newnode->nid = $nid;
+    $newnode->created = strtotime("now");
+  }
+  $newnode->type = 'sf_' . strtolower($object);
+  $newnode->uid = $user->uid;
+  $newnode->changed = strtotime("now");
+  $newnode->status = 1;
+  $newnode->comment = 0;
+  $newnode->promote = 0;
+  $newnode->moderate = 0;
+  $newnode->sticky = 0;
+  $newnode->language = 'und';
+
+  $newnode->title = $record['Name'];
+  
+  // Unset fields we do not want to save.
+  unset($record['attributes']);
+  unset($record['Description']);
+  
+  // Iterate through fields and map to the node field.
+  foreach($record as $field => $record) {
+    $field = salesforce_api_prep_field($field);
+    $newnode->{'sf_' . $field}['und']['0']['value'] = $record;
+  }
+  
+  node_object_prepare($newnode);
+
+  node_save($newnode);
+  
+  // Message to display when operation complete
+  $context['message'] = t("Import # @id - @name imported", array('@id' => $record['Id'], '@name' => $record['Name']));
+  // defien operation as finished
+  $context['finished'] = 1;
+}
+
+/**
+ * The function called when batch import is finish. Displays a success or error message.
+ *
+ * @param type $success
+ * @param type $results
+ * @param type $operations 
+ */
+function salesforce_batch_finished($success, $results, $operations) {
+
+  if ($success) {
+    drupal_set_message(t('All records have been imported.'));
+  }
+  else {
+    drupal_set_message(t('Finished with error.'));
+  }
+
+}
+
+/**
+ * REST request on Salesforce object and install missing fields.
+ *
+ * @param type $object
+ * @param type $account_id
+ * @param type $instance_url
+ * @param type $access_token 
+ */
+function salesforce_batch_install_fields($object, $account_id, $instance_url, $access_token) {
+  // REST request to location specific record and return fields.
+  $record = salesforce_api_object_show_by_id($object, $account_id, $instance_url, $access_token);
+  // Unset fields we do not want to create.
+  unset($record['attributes']);
+  // Interate through fields in record.
+  foreach($record as $field => $record) {
+    // If a field name is longer than what is supported unset and provide message.
+    if (strlen($field) > 29 ) {
+      drupal_set_message($field . " was not created because the field name is longer than 29 characters. 
+        To import the field rename the field in salesforce and import again.");
+      watchdog('salesforce_batch_tolong', 'Field @field is more than 29 characters as was not created.', array('@field' => $field));
+      unset($field);
+    }
+    $field = salesforce_api_prep_field($field);
+    // Install fields and field instances.
+    salesforce_api_install_fields($object, $field);
+    
+    watchdog('salesforce_batch', 'Field @field created', array('@field' => $field));
+  }
+  
+  
+  
+}
