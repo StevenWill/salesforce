@@ -1,10 +1,11 @@
 <?php
 /**
- * @file module for salesforce
+ * @file
+ * Module file for salesforce.
  */
 
 /**
- * Implement hook_menu()
+ * Implements hook_menu().
  */
 function salesforce_menu() {
   $items = array();
@@ -30,15 +31,18 @@ function salesforce_menu() {
 /**
  * Define batch import and processes.
  *
- * @param type $form
- * @param type $form_state 
+ * @param array $form
+ *   Form values as arrays.
+ *
+ * @param array $form_state
+ *   Form state values as arrays. 
  */
 function salesforce_batch($form, $form_state) {
   // Define the batch settings.
   $batch = array(
-    'title' => t('Import Jobs'), // Title to display while running.
-    'operations' => array(), // Operations to complete, in order. Defined below.
-    'finished' => 'salesforce_accounts_batch_finished', // Last function to call.
+    'title' => t('Import Jobs'),
+    'operations' => array(), 
+    'finished' => 'salesforce_accounts_batch_finished',
     'init_message' => t('Initializing...'),
     'progress_message' => t('Operation @current out of @total.'),
     'error_message' => t('Job importing received a error.'),
@@ -77,12 +81,12 @@ function salesforce_batch($form, $form_state) {
 /**
  * Salesforce batch process to create notes and map fields.
  *
- * @global type $user
- * @param type $object
- * @param type $account
- * @param type $instance_url
- * @param type $access_token
- * @param type $context 
+ * @global string $user
+ * @param object $object
+ * @param string $account
+ * @param string $instance_url
+ * @param sting $access_token
+ * @param string $context 
  */
 function salesforce_batch_process($object, $account, $instance_url, $access_token, &$context) {
   global $user;
@@ -139,11 +143,12 @@ function salesforce_batch_process($object, $account, $instance_url, $access_toke
 }
 
 /**
- * The function called when batch import is finish. Displays a success or error message.
+ * The function called when batch import is finish. 
+ * Displays a success or error message.
  *
- * @param type $success
- * @param type $results
- * @param type $operations 
+ * @param string $success
+ * @param string $results
+ * @param string $operations 
  */
 function salesforce_batch_finished($success, $results, $operations) {
 
@@ -159,10 +164,10 @@ function salesforce_batch_finished($success, $results, $operations) {
 /**
  * REST request on Salesforce object and install missing fields.
  *
- * @param type $object
- * @param type $account_id
- * @param type $instance_url
- * @param type $access_token 
+ * @param object $object
+ * @param int $account_id
+ * @param string $instance_url
+ * @param string $access_token 
  */
 function salesforce_batch_install_fields($object, $account_id, $instance_url, $access_token) {
   // REST request to location specific record and return fields.
