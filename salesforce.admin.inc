@@ -8,7 +8,8 @@
 /**
  * Salesforce admin form to setup account and objects.
  *
- * @return type 
+ * @return array
+ *   Admin values to render form.
  */
 function salesforce_admin_form() {
   $form = array();
@@ -33,7 +34,7 @@ function salesforce_admin_form() {
   $form['salesforce_username'] = array(
     '#type' => 'textfield',
     '#title' => t('Username'),
-    '#default_value' => variable_get('salesforce_username',''),
+    '#default_value' => variable_get('salesforce_username', ''),
   );
   $form['salesforce_password'] = array(
     '#type' => 'textfield',
@@ -57,16 +58,21 @@ function salesforce_admin_form() {
 /**
  * Salesforce Import form.
  *
- * @param type $form
- * @param type $form_state
- * @return array 
+ * @param array $form
+ *   Elements to build form.
+ *
+ * @param array $form_state
+ *   State of form elements and values.
+ *
+ * @return array
+ *   Import form to start he batch import process.
  */
 function salesforce_import($form, $form_state) {
   $form = array();
   $objects = explode(",", variable_get('salesforce_objects', ''));
   $options = array();
-  foreach($objects as $value) {
-    $options[trim($value)] = trim($value); 
+  foreach ($objects as $value) {
+    $options[trim($value)] = trim($value);
   }
 
   $form['object'] = array(
