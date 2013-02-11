@@ -2,12 +2,10 @@
 /**
  * @file
  * Install Salesforce
- * 
  */
 
 /**
- * Implement hook_install()
- *
+ * Implements hook_install().
  */
 function salesforce_install() {
   variable_set('salesforce_client_id', '');
@@ -20,8 +18,7 @@ function salesforce_install() {
 }
 
 /**
- * Implement hook_uninstall()
- *
+ * Implements hook_uninstall().
  */
 function salesforce_uninstall() {
   variable_del('salesforce_client_id');
