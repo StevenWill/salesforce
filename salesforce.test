@@ -18,7 +18,7 @@ class SalesforceTestCase extends DrupalWebTestCase {
     parent::setUp('salesforce_api', 'salesforce');
   }
 
-  function salesforce_createuser() {
+  function salesforceCreateUser() {
     $rid = 3;//Administrator role
     // Create a user assigned to that role.
     $edit = array();
@@ -28,15 +28,15 @@ class SalesforceTestCase extends DrupalWebTestCase {
     $edit['pass']   = user_password();
     $edit['status'] = 1;
     $account = user_save('', $edit);
- 
+
     // Create and login user.
     $account = $this->drupalCreateUser(array('access content', 'administer modules'));
     $this->drupalLogin($account);
   }
 
   //TODO: Finihs writing simpletest functions.
-  function salesforce_testsetup() {
- 
+  function salesforceTestSetup() {
+
     // Test saving settings.
     $edit = array(
       'salesforce_client_id' => '',
@@ -50,7 +50,7 @@ class SalesforceTestCase extends DrupalWebTestCase {
     $this->drupalPost('admin/config/services/salesforce', $edit, t('Save Configuration'));
   }
 
-  function salesforce_testimport() {
+  function salesforceTestImport() {
     //TODO: Write simple test import.
 
     $this->drupalPost('admin/config/services/salesforce_import', array(), t('Import'));
