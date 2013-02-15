@@ -10,20 +10,20 @@
 function salesforce_menu() {
   $items = array();
   $items['admin/config/services/salesforce'] = array(
-    'title' => t('Salesforce: Account Setup'),
+    'title' => 'Salesforce: Account Setup',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('salesforce_admin_form'),
     'file' => 'salesforce.admin.inc',
     'access arguments' => array('administer modules'),
-    'description' => t('Account information to access Salesforce.'),
+    'description' => 'Account information to access Salesforce.',
   );
   $items['admin/config/services/salesforce_import'] = array(
-    'title' => t('Salesforce: Import Accounts'),
+    'title' => 'Salesforce: Import Accounts',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('salesforce_import'),
     'access arguments' => array('administer modules'),
     'file' => 'salesforce.admin.inc',
-    'description' => t('Import records from Salesforce'),
+    'description' => 'Import records from Salesforce',
   );
   return $items;
 }
@@ -35,19 +35,19 @@ function salesforce_menu() {
  *   Form values as arrays.
  *
  * @param array $form_state
- *   Form state values as arrays. 
+ *   Form state values as arrays.
  */
 function salesforce_batch($form, $form_state) {
   // Define the batch settings.
   $batch = array(
     'title' => t('Import Jobs'),
-    'operations' => array(), 
+    'operations' => array(),
     'finished' => 'salesforce_accounts_batch_finished',
     'init_message' => t('Initializing...'),
     'progress_message' => t('Operation @current out of @total.'),
     'error_message' => t('Job importing received a error.'),
   );
-  
+
   // Check for the access token.
   if (!isset($_SESSION['salesforce']['access_token']) || $_SESSION['salesforce']['access_token'] == '') {
     salesforce_api_access_session();
@@ -56,20 +56,20 @@ function salesforce_batch($form, $form_state) {
   if ((time() - $_SESSION['salesforce']['registered']) > (30 * 60)) {
     salesforce_api_access_session();
   }
-  
+
   $object = $form_state['values']['object'];
   $instance_url = $_SESSION['salesforce']['instance_url'];
   $access_token = $_SESSION['salesforce']['access_token'];
-  
+
   // REST api request to return a list of the objects
   $return = salesforce_api_object_show($object, $instance_url, $access_token);
 
-  // Check for the content type and create if not available. 
+  // Check for the content type and create if not available.
   $batch['operations'][] = array('salesforce_api_content_type', array($object));
   // Check for object fields and compare to fields on the content type.
   $batch['operations'][] = array('salesforce_batch_install_fields', array($object, $return['records']['0']['Id'], $instance_url, $access_token));
-  
-  foreach($return['records'] as $account) {
+
+  foreach ($return['records'] as $account) {
     // Iterate through each Object record and save or update as node.
     $batch['operations'][] = array('salesforce_batch_process', array($object, $account, $instance_url, $access_token));
   }
@@ -86,7 +86,7 @@ function salesforce_batch($form, $form_state) {
  * @param string $account
  * @param string $instance_url
  * @param sting $access_token
- * @param string $context 
+ * @param string $context
  */
 function salesforce_batch_process($object, $account, $instance_url, $access_token, &$context) {
   global $user;
@@ -127,7 +127,7 @@ function salesforce_batch_process($object, $account, $instance_url, $access_toke
   unset($record['Description']);
 
   // Iterate through fields and map to the node field.
-  foreach($record as $field => $value) {
+  foreach ($record as $field => $value) {
     $field = salesforce_api_prep_field($field);
     $newnode->{'sf_' . $field}['und']['0']['value'] = $value;
   }
