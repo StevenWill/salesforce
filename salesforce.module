@@ -143,12 +143,12 @@ function salesforce_batch_process($object, $account, $instance_url, $access_toke
 }
 
 /**
- * The function called when batch import is finish. 
+ * The function called when batch import is finish.
  * Displays a success or error message.
  *
  * @param string $success
  * @param string $results
- * @param string $operations 
+ * @param string $operations
  */
 function salesforce_batch_finished($success, $results, $operations) {
 
@@ -167,7 +167,7 @@ function salesforce_batch_finished($success, $results, $operations) {
  * @param object $object
  * @param int $account_id
  * @param string $instance_url
- * @param string $access_token 
+ * @param string $access_token
  */
 function salesforce_batch_install_fields($object, $account_id, $instance_url, $access_token) {
   // REST request to location specific record and return fields.
@@ -175,21 +175,18 @@ function salesforce_batch_install_fields($object, $account_id, $instance_url, $a
   // Unset fields we do not want to create.
   unset($record['attributes']);
   // Interate through fields in record.
-  foreach($record as $field => $record) {
+  foreach ($record as $field => $record) {
     // If a field name is longer than what is supported unset and provide message.
     if (strlen($field) > 29 ) {
-      drupal_set_message($field . " was not created because the field name is longer than 29 characters. 
-        To import the field rename the field in salesforce and import again.");
+      drupal_set_message("@field was not created because the field name is longer than 29 characters.
+        To import the field rename the field in salesforce and import again.", array('@field' => $field));
       watchdog('salesforce_batch_tolong', 'Field @field is more than 29 characters as was not created.', array('@field' => $field));
       unset($field);
     }
     $field = salesforce_api_prep_field($field);
     // Install fields and field instances.
     salesforce_api_install_fields($object, $field);
-    
+
     watchdog('salesforce_batch', 'Field @field created', array('@field' => $field));
   }
-  
-  
-  
 }
